@@ -1,0 +1,5 @@
+dlib>=19.22.0
+paddlepaddle-gpu>=2.1.0
+paddle-lpips>=0.1.2
+ppgan>=0.1.3
+moviepy>=1.0.3
