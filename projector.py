@@ -6,7 +6,7 @@ from paddle.nn import functional as F
 from paddle.vision import transforms
 
 import paddle_lpips as lpips
-from utils import arg_type, func_args, get_generator, get_pSp
+from utils import arg_type, func_args, make_image, get_generator, get_pSp
 
 import PIL
 from PIL import Image
@@ -18,16 +18,6 @@ def get_lr(t, ts, initial_lr, final_lr):
     alpha = pow(final_lr/initial_lr, 1/ts)**(t*ts)
 
     return initial_lr * alpha
-
-
-def make_image(tensor):
-    return (
-        ((tensor.detach() + 1) / 2 * 255)
-        .clip(min=0, max=255)
-        .transpose((0, 2, 3, 1))
-        .numpy()
-        .astype('uint8')
-    )
 
 
 def project(
@@ -134,6 +124,7 @@ def project(
 
     pbar = tqdm(range(step))
 
+    latent_n = latent_in
     for i in pbar:
         t = i / step
         lr = get_lr(t, step, start_lr, final_lr)
@@ -149,8 +140,6 @@ def project(
             for idx in range(generator.n_latent):
                 latent_list.append(latent_dict[idx])
             latent_n = paddle.concat(latent_list, 1)
-        else:
-            latent_n = latent_in
 
         img_gen, _ = generator([latent_n], input_is_latent=True, randomize_noise=False)
         frames.append(make_image(img_gen))
@@ -211,6 +200,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "files", metavar="FILES", nargs="+", help="path to image files to be projected"
     )
+    parser.add_argument(
+        "--output", type=str, default="./output", help="output directory"
+    )
 
     args = parser.parse_args()
 
@@ -234,15 +226,22 @@ if __name__ == "__main__":
 
     imgs_seq, latent_code = project(imgs, masks, **{arg_name: getattr(args, arg_name) for arg_name in arg_names})
 
+    os.makedirs(args.output, exist_ok=True)
     for i, input_name in enumerate(args.files):
 
-        code_name = os.path.splitext(os.path.basename(input_name))[0] + ".pd"
+        code_name = os.path.join(
+            args.output, 
+            os.path.splitext(os.path.basename(input_name))[0] + ".pd"
+        )
         latent_file = {
             "latent_code": latent_code[i],
         }
         paddle.save(latent_file, code_name)
 
-        img_name = os.path.splitext(os.path.basename(input_name))[0] + "-project.png"
+        img_name = os.path.join(
+            args.output, 
+            os.path.splitext(os.path.basename(input_name))[0] + "-project.png"
+        )
         pil_img = Image.fromarray(imgs_seq[i][-1])
         pil_img.save(img_name)
 
@@ -251,6 +250,9 @@ if __name__ == "__main__":
             duration = 5
             save_video(
                 imgs_seq[i],
-                os.path.splitext(os.path.basename(input_name))[0] + "-project.mp4",
+                os.path.join(
+                    args.output, 
+                    os.path.splitext(os.path.basename(input_name))[0] + "-project.mp4"
+                ),
                 fps, duration
             )

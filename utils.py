@@ -108,6 +108,16 @@ def func_args(parser, func):
     return parser, arg_names
 
 
+def make_image(tensor):
+    return (
+        ((tensor.detach() + 1) / 2 * 255)
+        .clip(min=0, max=255)
+        .transpose((0, 2, 3, 1))
+        .numpy()
+        .astype('uint8')
+    )
+
+
 def save_video(images, filename, fps, duration):
     def make_frame(t):
         idx = min(int(np.ceil(t / duration * len(images))), len(images)-1)
